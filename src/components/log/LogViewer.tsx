@@ -111,6 +111,11 @@ function renderLineWithLinks(text: string): React.ReactNode[] {
 
 // Memoized log line row component
 const LogLineRow = memo((props: {
+  ariaAttributes: {
+    'aria-posinset': number;
+    'aria-setsize': number;
+    role: 'listitem';
+  };
   index: number;
   style: React.CSSProperties;
   lines: ParsedLogLine[];
@@ -118,6 +123,10 @@ const LogLineRow = memo((props: {
 }) => {
   const line = props.lines[props.index];
   const theme = props.theme;
+
+  if (!line) {
+    return <div style={props.style} />;
+  }
 
   const content = line.timestampEnd
     ? line.raw.substring(line.timestampEnd)
@@ -127,6 +136,7 @@ const LogLineRow = memo((props: {
     <div
       style={props.style}
       className={`log-line ${theme === 'dark' ? 'log-line-dark' : 'log-line-light'}`}
+      {...props.ariaAttributes}
     >
       {line.timestamp && (
         <span className="log-timestamp">{line.timestamp}</span>
@@ -265,16 +275,10 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
           <List
             listRef={listRef}
             className="log-viewer"
-            rowComponent={(rowProps) => (
-              <LogLineRow
-                {...rowProps}
-                lines={displayLines}
-                theme={theme}
-              />
-            )}
+            rowComponent={(props) => <LogLineRow {...props} />}
             rowCount={displayLines.length}
             rowHeight={lineHeight}
-            rowProps={{}}
+            rowProps={{ lines: displayLines, theme }}
             onRowsRendered={handleRowsRendered}
             style={{
               fontFamily: 'Menlo, Monaco, "Courier New", monospace',
