@@ -67,10 +67,11 @@ body {
 
 .log-line {
   padding: 2px 8px;
-  white-space: pre;
-  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
   line-height: 1.5;
   border-bottom: 1px solid transparent;
+  overflow: visible;
 }
 
 .log-line:hover {

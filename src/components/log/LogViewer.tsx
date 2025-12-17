@@ -1,7 +1,4 @@
-import { useEffect, useRef, useState, memo } from 'react';
-import { List } from 'react-window';
-import type { ListImperativeAPI } from 'react-window';
-import AutoSizer from 'react-virtualized-auto-sizer';
+import { useEffect, useRef, useState } from 'react';
 import type { LogSession } from '../../types';
 import { useLogStore } from '../../stores/logStore';
 import { useSettingsStore } from '../../stores/settingsStore';
@@ -109,57 +106,11 @@ function renderLineWithLinks(text: string): React.ReactNode[] {
   });
 }
 
-// Memoized log line row component
-const LogLineRow = memo((props: {
-  ariaAttributes: {
-    'aria-posinset': number;
-    'aria-setsize': number;
-    role: 'listitem';
-  };
-  index: number;
-  style: React.CSSProperties;
-  lines: ParsedLogLine[];
-  theme: string;
-}) => {
-  const line = props.lines[props.index];
-  const theme = props.theme;
-
-  if (!line) {
-    return <div style={props.style} />;
-  }
-
-  const content = line.timestampEnd
-    ? line.raw.substring(line.timestampEnd)
-    : line.raw;
-
-  return (
-    <div
-      style={props.style}
-      className={`log-line ${theme === 'dark' ? 'log-line-dark' : 'log-line-light'}`}
-      {...props.ariaAttributes}
-    >
-      {line.timestamp && (
-        <span className="log-timestamp">{line.timestamp}</span>
-      )}
-      <span className={line.isError ? 'log-error' : ''}>
-        {renderLineWithLinks(content)}
-      </span>
-    </div>
-  );
-}, (prevProps, nextProps) => {
-  return prevProps.index === nextProps.index &&
-    prevProps.lines === nextProps.lines &&
-    prevProps.theme === nextProps.theme;
-});
-
-LogLineRow.displayName = 'LogLineRow';
-
 export function LogViewer({ session, isActive }: LogViewerProps) {
-  const listRef = useRef<ListImperativeAPI>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const logLinesRef = useRef<ParsedLogLine[]>([]);
   const [displayLines, setDisplayLines] = useState<ParsedLogLine[]>([]);
   const isAtBottomRef = useRef(true);
-  const containerRef = useRef<HTMLDivElement>(null);
   const filterTimerRef = useRef<number | null>(null);
   const pendingLinesRef = useRef<ParsedLogLine[]>([]);
   const rafIdRef = useRef<number | null>(null);
@@ -167,9 +118,6 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
   const { grepFilter } = useLogStore();
   const theme = useSettingsStore((state) => state.theme);
   const grepFiltersRef = useRef<Array<{ pattern: RegExp; exclude: boolean }>>([]);
-
-  // Line height calculation based on font size
-  const lineHeight = Math.ceil(session.fontSize * 1.5);
 
   // Update grep filters when filter changes
   useEffect(() => {
@@ -250,45 +198,53 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
 
   // Auto-scroll when new lines arrive and user is at bottom
   useEffect(() => {
-    if (isAtBottomRef.current && displayLines.length > 0 && listRef.current) {
-      listRef.current.scrollToRow({
-        index: displayLines.length - 1,
-        align: 'end',
-      });
+    if (isAtBottomRef.current && containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   }, [displayLines.length]);
 
-  // Handle rows rendered to detect if user is at bottom
-  const handleRowsRendered = ({ stopIndex }: { startIndex: number; stopIndex: number }) => {
-    // Consider "at bottom" if showing last row or close to it
-    isAtBottomRef.current = stopIndex >= displayLines.length - 3;
+  // Handle scroll to detect if user is at bottom
+  const handleScroll = () => {
+    if (!containerRef.current) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    const scrollBottom = scrollTop + clientHeight;
+
+    // Consider "at bottom" if within 50px of bottom
+    isAtBottomRef.current = scrollHeight - scrollBottom < 50;
   };
 
   return (
     <div
       ref={containerRef}
-      className={`h-full w-full ${isActive ? '' : 'opacity-90'}`}
-      style={{ padding: '8px' }}
+      className={`h-full w-full log-viewer ${isActive ? '' : 'opacity-90'}`}
+      style={{
+        padding: '8px',
+        overflow: 'auto',
+        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+        fontSize: `${session.fontSize}px`,
+      }}
+      onScroll={handleScroll}
     >
-      <AutoSizer>
-        {({ height, width }) => (
-          <List
-            listRef={listRef}
-            className="log-viewer"
-            rowComponent={(props) => <LogLineRow {...props} />}
-            rowCount={displayLines.length}
-            rowHeight={lineHeight}
-            rowProps={{ lines: displayLines, theme }}
-            onRowsRendered={handleRowsRendered}
-            style={{
-              fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-              fontSize: `${session.fontSize}px`,
-              height,
-              width,
-            }}
-          />
-        )}
-      </AutoSizer>
+      {displayLines.map((line, index) => {
+        const content = line.timestampEnd
+          ? line.raw.substring(line.timestampEnd)
+          : line.raw;
+
+        return (
+          <div
+            key={index}
+            className={`log-line ${theme === 'dark' ? 'log-line-dark' : 'log-line-light'}`}
+          >
+            {line.timestamp && (
+              <span className="log-timestamp">{line.timestamp}</span>
+            )}
+            <span className={line.isError ? 'log-error' : ''}>
+              {renderLineWithLinks(content)}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
