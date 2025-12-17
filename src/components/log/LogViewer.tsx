@@ -106,18 +106,13 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
-  const { grepFilter, autoScroll, setAutoScroll } = useLogStore();
+  const { grepFilter } = useLogStore();
   const theme = useSettingsStore((state) => state.theme);
   const grepFiltersRef = useRef<Array<{ pattern: RegExp; exclude: boolean }>>([]);
 
   // Buffer for batched writes
   const logBufferRef = useRef<string[]>([]);
   const rafIdRef = useRef<number | null>(null);
-  const autoScrollRef = useRef(autoScroll);
-  // Keep autoScroll ref in sync and stop scrolling when paused
-  useEffect(() => {
-    autoScrollRef.current = autoScroll;
-  }, [autoScroll]);
 
   // Update grep filters when filter changes
   useEffect(() => {
@@ -156,30 +151,6 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
 
-    // Detect user scroll - pause auto-scroll when user scrolls up
-    const viewport = containerRef.current.querySelector('.xterm-viewport');
-    if (viewport) {
-      viewport.addEventListener('wheel', (e) => {
-        const wheelEvent = e as WheelEvent;
-        // User scrolling up
-        if (wheelEvent.deltaY < 0 && autoScrollRef.current) {
-          setAutoScroll(false);
-        }
-      }, { passive: true });
-
-      viewport.addEventListener('scroll', () => {
-        if (!terminalRef.current) return;
-
-        const viewportEl = viewport as HTMLElement;
-        const isAtBottom = viewportEl.scrollTop + viewportEl.clientHeight >= viewportEl.scrollHeight - 10;
-
-        // If user scrolled back to bottom, re-enable auto-scroll
-        if (isAtBottom && !autoScrollRef.current) {
-          // Don't auto-enable, let user click the button
-        }
-      }, { passive: true });
-    }
-
     // Handle resize
     const resizeObserver = new ResizeObserver(() => {
       if (fitAddonRef.current) {
@@ -216,24 +187,11 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
       return;
     }
 
-    // Check autoScroll before writing
-    const shouldScroll = autoScrollRef.current;
-
     // Write all buffered lines at once
     const output = logBufferRef.current.join('\r\n') + '\r\n';
     logBufferRef.current = [];
 
-    if (shouldScroll) {
-      terminalRef.current.write(output, () => {
-        // Auto scroll after write completes - check again in case it changed
-        if (autoScrollRef.current && terminalRef.current) {
-          terminalRef.current.scrollToBottom();
-        }
-      });
-    } else {
-      // Write without scroll callback
-      terminalRef.current.write(output);
-    }
+    terminalRef.current.write(output);
 
     rafIdRef.current = null;
   };

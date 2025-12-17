@@ -8,7 +8,6 @@ interface LogStore {
   viewMode: ViewMode;
   globalFontSize: number;
   grepFilter: string;
-  autoScroll: boolean;
 
   addSession: (config: Omit<LogSession, 'id' | 'isStreaming' | 'fontSize'>) => string;
   removeSession: (id: string) => void;
@@ -20,7 +19,6 @@ interface LogStore {
   setGlobalFontSize: (size: number) => void;
   setViewMode: (mode: ViewMode) => void;
   setGrepFilter: (filter: string) => void;
-  setAutoScroll: (enabled: boolean) => void;
   clearSessions: () => void;
 }
 
@@ -30,7 +28,6 @@ export const useLogStore = create<LogStore>((set, get) => ({
   viewMode: 'single',
   globalFontSize: 10,
   grepFilter: '',
-  autoScroll: true,
 
   addSession: (config) => {
     const id = uuidv4();
@@ -104,10 +101,6 @@ export const useLogStore = create<LogStore>((set, get) => ({
 
   setGrepFilter: (filter) => {
     set({ grepFilter: filter });
-  },
-
-  setAutoScroll: (enabled) => {
-    set({ autoScroll: enabled });
   },
 
   clearSessions: () => {

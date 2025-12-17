@@ -3,7 +3,7 @@ import { useLogStore } from '../../stores/logStore';
 import type { ViewMode } from '../../types';
 
 export function LogToolbar() {
-  const { viewMode, setViewMode, globalFontSize, setGlobalFontSize, grepFilter, setGrepFilter, autoScroll, setAutoScroll, sessions, stopAllSessions } = useLogStore();
+  const { viewMode, setViewMode, globalFontSize, setGlobalFontSize, grepFilter, setGrepFilter, sessions, stopAllSessions } = useLogStore();
   const [filterInput, setFilterInput] = useState(grepFilter);
   const [isStopping, setIsStopping] = useState(false);
 
@@ -81,18 +81,6 @@ export function LogToolbar() {
             </button>
           )}
         </div>
-
-        {/* Auto Scroll Toggle */}
-        <button
-          onClick={() => setAutoScroll(!autoScroll)}
-          className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-            autoScroll ? 'bg-blue-600 hover:bg-blue-700 text-white' : ''
-          }`}
-          style={!autoScroll ? { backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' } : undefined}
-          title={autoScroll ? '자동 스크롤 켜짐' : '자동 스크롤 꺼짐'}
-        >
-          {autoScroll ? '⏬ 자동스크롤' : '⏸ 일시정지'}
-        </button>
 
         {/* Stop All Streams */}
         {sessions.length > 0 && (
