@@ -1,60 +1,16 @@
-import { useEffect, useRef } from 'react';
-import { Terminal } from '@xterm/xterm';
-import type { ITheme } from '@xterm/xterm';
-import { FitAddon } from '@xterm/addon-fit';
-import { WebLinksAddon } from '@xterm/addon-web-links';
-import '@xterm/xterm/css/xterm.css';
+import { useEffect, useRef, useState, memo } from 'react';
+import { FixedSizeList as List, ListChildComponentProps } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
 import type { LogSession } from '../../types';
 import { useLogStore } from '../../stores/logStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 
-const darkTheme: ITheme = {
-  background: '#1a1a1a',
-  foreground: '#e4e4e7',
-  cursor: '#e4e4e7',
-  cursorAccent: '#1a1a1a',
-  selectionBackground: '#3b82f680',
-  black: '#27272a',
-  red: '#ef4444',
-  green: '#22c55e',
-  yellow: '#eab308',
-  blue: '#3b82f6',
-  magenta: '#a855f7',
-  cyan: '#06b6d4',
-  white: '#e4e4e7',
-  brightBlack: '#52525b',
-  brightRed: '#f87171',
-  brightGreen: '#4ade80',
-  brightYellow: '#facc15',
-  brightBlue: '#60a5fa',
-  brightMagenta: '#c084fc',
-  brightCyan: '#22d3ee',
-  brightWhite: '#fafafa',
-};
-
-const lightTheme: ITheme = {
-  background: '#ffffff',
-  foreground: '#18181b',
-  cursor: '#18181b',
-  cursorAccent: '#ffffff',
-  selectionBackground: '#3b82f640',
-  black: '#18181b',
-  red: '#dc2626',
-  green: '#16a34a',
-  yellow: '#ca8a04',
-  blue: '#2563eb',
-  magenta: '#9333ea',
-  cyan: '#0891b2',
-  white: '#f4f4f5',
-  brightBlack: '#71717a',
-  brightRed: '#ef4444',
-  brightGreen: '#22c55e',
-  brightYellow: '#eab308',
-  brightBlue: '#3b82f6',
-  brightMagenta: '#a855f7',
-  brightCyan: '#06b6d4',
-  brightWhite: '#fafafa',
-};
+interface ParsedLogLine {
+  raw: string;
+  timestamp?: string;
+  timestampEnd?: number;
+  isError?: boolean;
+}
 
 interface LogViewerProps {
   session: LogSession;
@@ -102,174 +58,8 @@ function applyGrepFilter(line: string, filters: Array<{ pattern: RegExp; exclude
   return true;
 }
 
-export function LogViewer({ session, isActive }: LogViewerProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const terminalRef = useRef<Terminal | null>(null);
-  const fitAddonRef = useRef<FitAddon | null>(null);
-  const { grepFilter } = useLogStore();
-  const theme = useSettingsStore((state) => state.theme);
-  const grepFiltersRef = useRef<Array<{ pattern: RegExp; exclude: boolean }>>([]);
-
-  // Buffer for batched writes
-  const logBufferRef = useRef<string[]>([]);
-  const rafIdRef = useRef<number | null>(null);
-  const isAtBottomRef = useRef(true);
-
-  // Update grep filters when filter changes
-  useEffect(() => {
-    grepFiltersRef.current = parseGrepPipeline(grepFilter);
-  }, [grepFilter]);
-
-  // Initialize terminal
-  useEffect(() => {
-    if (!containerRef.current) return;
-
-    const terminal = new Terminal({
-      theme: theme === 'dark' ? darkTheme : lightTheme,
-      fontSize: session.fontSize,
-      fontFamily: 'Menlo, Monaco, "Courier New", monospace',
-      cursorBlink: false,
-      cursorStyle: 'bar',
-      scrollback: 50000,
-      convertEol: true,
-      disableStdin: true,
-      overviewRulerWidth: 10,
-      fastScrollSensitivity: 5,
-      scrollSensitivity: 3,
-      smoothScrollDuration: 0,
-      allowProposedApi: true,
-      scrollOnUserInput: false,
-    });
-
-    const fitAddon = new FitAddon();
-    const webLinksAddon = new WebLinksAddon();
-
-    terminal.loadAddon(fitAddon);
-    terminal.loadAddon(webLinksAddon);
-    terminal.open(containerRef.current);
-    fitAddon.fit();
-
-    terminalRef.current = terminal;
-    fitAddonRef.current = fitAddon;
-
-    // Track user scroll position
-    terminal.onScroll(() => {
-      const buffer = terminal.buffer.active;
-      const viewport = buffer.viewportY;
-      const baseY = buffer.baseY;
-      const rows = terminal.rows;
-
-      // User is at bottom if viewport is showing the last rows
-      isAtBottomRef.current = viewport + rows >= baseY + rows;
-    });
-
-    // Handle resize
-    const resizeObserver = new ResizeObserver(() => {
-      if (fitAddonRef.current) {
-        fitAddonRef.current.fit();
-      }
-    });
-    resizeObserver.observe(containerRef.current);
-
-    return () => {
-      resizeObserver.disconnect();
-      terminal.dispose();
-    };
-  }, []);
-
-  // Update font size
-  useEffect(() => {
-    if (terminalRef.current) {
-      terminalRef.current.options.fontSize = session.fontSize;
-      fitAddonRef.current?.fit();
-    }
-  }, [session.fontSize]);
-
-  // Update terminal theme
-  useEffect(() => {
-    if (terminalRef.current) {
-      terminalRef.current.options.theme = theme === 'dark' ? darkTheme : lightTheme;
-    }
-  }, [theme]);
-
-  // Flush buffered logs to terminal (batched for performance)
-  const flushLogs = () => {
-    if (!terminalRef.current || logBufferRef.current.length === 0) {
-      rafIdRef.current = null;
-      return;
-    }
-
-    // Write all buffered lines at once
-    const output = logBufferRef.current.join('\r\n') + '\r\n';
-    logBufferRef.current = [];
-
-    // Only auto-scroll if user is at bottom
-    const shouldScroll = isAtBottomRef.current;
-    terminalRef.current.write(output, () => {
-      if (shouldScroll && terminalRef.current) {
-        terminalRef.current.scrollToBottom();
-      }
-    });
-
-    rafIdRef.current = null;
-  };
-
-  // Schedule a flush on next animation frame
-  const scheduleFlush = () => {
-    if (rafIdRef.current === null) {
-      rafIdRef.current = requestAnimationFrame(flushLogs);
-    }
-  };
-
-  // Listen for log data
-  useEffect(() => {
-    const unsubscribeData = window.electronAPI.onLogData((data) => {
-      if (data.sessionId === session.id && terminalRef.current) {
-        // Process and buffer lines
-        const lines = data.data.split('\n');
-        for (const line of lines) {
-          if (line.trim()) {
-            // Apply grep filter
-            if (!applyGrepFilter(line, grepFiltersRef.current)) {
-              continue;
-            }
-            const highlightedLine = highlightTimestamp(line);
-            logBufferRef.current.push(highlightedLine);
-          }
-        }
-        // Schedule batched write
-        scheduleFlush();
-      }
-    });
-
-    const unsubscribeError = window.electronAPI.onLogError((data) => {
-      if (data.sessionId === session.id && terminalRef.current) {
-        logBufferRef.current.push(`\x1b[31m[ERROR] ${data.error}\x1b[0m`);
-        scheduleFlush();
-      }
-    });
-
-    return () => {
-      unsubscribeData();
-      unsubscribeError();
-      // Cancel pending flush
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current);
-      }
-    };
-  }, [session.id]);
-
-  return (
-    <div
-      ref={containerRef}
-      className={`h-full w-full ${isActive ? '' : 'opacity-90'}`}
-      style={{ padding: '8px' }}
-    />
-  );
-}
-
-// Timestamp highlighting with ANSI colors
-function highlightTimestamp(line: string): string {
+// Parse log line to extract timestamp and detect errors
+function parseLogLine(line: string): ParsedLogLine {
   // ISO 8601 pattern
   const isoPattern = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)/;
   // Simple datetime pattern
@@ -280,12 +70,213 @@ function highlightTimestamp(line: string): string {
   for (const pattern of [isoPattern, simplePattern, bracketPattern]) {
     const match = line.match(pattern);
     if (match) {
-      const timestamp = match[1];
-      const rest = line.substring(timestamp.length);
-      // Cyan color for timestamp
-      return `\x1b[36m${timestamp}\x1b[0m${rest}`;
+      return {
+        raw: line,
+        timestamp: match[1],
+        timestampEnd: match[1].length,
+      };
     }
   }
 
-  return line;
+  // Check for error indicators
+  const isError = /error|exception|fail|fatal/i.test(line);
+
+  return { raw: line, isError };
+}
+
+// Render URLs as clickable links
+function renderLineWithLinks(text: string): React.ReactNode[] {
+  const urlPattern = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlPattern);
+
+  return parts.map((part, i) => {
+    if (urlPattern.test(part)) {
+      return (
+        <a
+          key={i}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="log-link"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part}
+        </a>
+      );
+    }
+    return <span key={i}>{part}</span>;
+  });
+}
+
+// Memoized log line row component
+const LogLineRow = memo(({ index, style, data }: ListChildComponentProps<{ lines: ParsedLogLine[]; theme: string }>) => {
+  const line = data.lines[index];
+  const theme = data.theme;
+
+  const content = line.timestampEnd
+    ? line.raw.substring(line.timestampEnd)
+    : line.raw;
+
+  return (
+    <div
+      style={style}
+      className={`log-line ${theme === 'dark' ? 'log-line-dark' : 'log-line-light'}`}
+    >
+      {line.timestamp && (
+        <span className="log-timestamp">{line.timestamp}</span>
+      )}
+      <span className={line.isError ? 'log-error' : ''}>
+        {renderLineWithLinks(content)}
+      </span>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  return prevProps.index === nextProps.index &&
+    prevProps.data === nextProps.data &&
+    prevProps.style === nextProps.style;
+});
+
+LogLineRow.displayName = 'LogLineRow';
+
+export function LogViewer({ session, isActive }: LogViewerProps) {
+  const listRef = useRef<List>(null);
+  const logLinesRef = useRef<ParsedLogLine[]>([]);
+  const [displayLines, setDisplayLines] = useState<ParsedLogLine[]>([]);
+  const isAtBottomRef = useRef(true);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const filterTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingLinesRef = useRef<ParsedLogLine[]>([]);
+  const rafIdRef = useRef<number | null>(null);
+
+  const { grepFilter } = useLogStore();
+  const theme = useSettingsStore((state) => state.theme);
+  const grepFiltersRef = useRef<Array<{ pattern: RegExp; exclude: boolean }>>([]);
+
+  // Line height calculation based on font size
+  const lineHeight = Math.ceil(session.fontSize * 1.5);
+
+  // Update grep filters when filter changes
+  useEffect(() => {
+    grepFiltersRef.current = parseGrepPipeline(grepFilter);
+  }, [grepFilter]);
+
+  // Apply filter and update display
+  const applyFilterAndUpdate = () => {
+    if (filterTimerRef.current) {
+      clearTimeout(filterTimerRef.current);
+    }
+
+    filterTimerRef.current = setTimeout(() => {
+      const filters = grepFiltersRef.current;
+      const filtered = logLinesRef.current.filter(line =>
+        applyGrepFilter(line.raw, filters)
+      );
+      setDisplayLines(filtered);
+    }, 100);
+  };
+
+  // Re-filter when grep filter changes
+  useEffect(() => {
+    applyFilterAndUpdate();
+  }, [grepFilter]);
+
+  // Batch log updates using RAF
+  const scheduleBatchUpdate = () => {
+    if (rafIdRef.current === null) {
+      rafIdRef.current = requestAnimationFrame(() => {
+        logLinesRef.current.push(...pendingLinesRef.current);
+
+        // Limit buffer to 50,000 lines
+        if (logLinesRef.current.length > 50000) {
+          logLinesRef.current = logLinesRef.current.slice(-50000);
+        }
+
+        pendingLinesRef.current = [];
+        applyFilterAndUpdate();
+        rafIdRef.current = null;
+      });
+    }
+  };
+
+  // Listen for log data
+  useEffect(() => {
+    const unsubscribeData = window.electronAPI.onLogData((data) => {
+      if (data.sessionId === session.id) {
+        const lines = data.data.split('\n').filter(l => l.trim());
+        const parsed = lines.map(parseLogLine);
+        pendingLinesRef.current.push(...parsed);
+        scheduleBatchUpdate();
+      }
+    });
+
+    const unsubscribeError = window.electronAPI.onLogError((data) => {
+      if (data.sessionId === session.id) {
+        const errorLine: ParsedLogLine = {
+          raw: `[ERROR] ${data.error}`,
+          isError: true,
+        };
+        pendingLinesRef.current.push(errorLine);
+        scheduleBatchUpdate();
+      }
+    });
+
+    return () => {
+      unsubscribeData();
+      unsubscribeError();
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
+      if (filterTimerRef.current !== null) {
+        clearTimeout(filterTimerRef.current);
+      }
+    };
+  }, [session.id]);
+
+  // Auto-scroll when new lines arrive and user is at bottom
+  useEffect(() => {
+    if (isAtBottomRef.current && displayLines.length > 0 && listRef.current) {
+      listRef.current.scrollToItem(displayLines.length - 1, 'end');
+    }
+  }, [displayLines.length]);
+
+  // Handle scroll to detect if user is at bottom
+  const handleScroll = ({ scrollOffset }: { scrollOffset: number }) => {
+    if (!containerRef.current) return;
+
+    const totalHeight = displayLines.length * lineHeight;
+    const viewportHeight = containerRef.current.clientHeight;
+    const scrollBottom = scrollOffset + viewportHeight;
+
+    // Consider "at bottom" if within 50px of bottom
+    isAtBottomRef.current = totalHeight - scrollBottom < 50;
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className={`h-full w-full ${isActive ? '' : 'opacity-90'}`}
+      style={{ padding: '8px' }}
+    >
+      <AutoSizer>
+        {({ height, width }) => (
+          <List
+            ref={listRef}
+            className="log-viewer"
+            height={height}
+            width={width}
+            itemCount={displayLines.length}
+            itemSize={lineHeight}
+            itemData={{ lines: displayLines, theme }}
+            onScroll={handleScroll}
+            style={{
+              fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+              fontSize: `${session.fontSize}px`,
+            }}
+          >
+            {LogLineRow}
+          </List>
+        )}
+      </AutoSizer>
+    </div>
+  );
 }

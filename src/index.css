@@ -59,42 +59,86 @@ body {
   -webkit-app-region: no-drag;
 }
 
-/* xterm.js scrollbar always visible */
-.xterm-viewport {
-  overflow-y: scroll !important;
-  pointer-events: auto !important;
+/* Log viewer styles */
+.log-viewer {
+  font-family: Menlo, Monaco, "Courier New", monospace;
+  overflow: auto;
 }
 
-/* Ensure xterm container doesn't block scroll events */
-.xterm {
-  pointer-events: auto !important;
+.log-line {
+  padding: 2px 8px;
+  white-space: pre;
+  overflow-x: auto;
+  line-height: 1.5;
+  border-bottom: 1px solid transparent;
 }
 
-/* Ensure terminal screen allows scrolling */
-.xterm .xterm-screen {
-  position: relative;
-  pointer-events: none; /* Let events pass through to viewport */
+.log-line:hover {
+  background-color: rgba(59, 130, 246, 0.1);
 }
 
-.xterm .xterm-screen canvas {
-  pointer-events: none; /* Canvas should not block wheel events */
+.log-line-dark {
+  color: #e4e4e7;
+  background-color: #1a1a1a;
 }
 
-.xterm-viewport::-webkit-scrollbar {
+.log-line-light {
+  color: #18181b;
+  background-color: #ffffff;
+}
+
+.log-timestamp {
+  color: #06b6d4;
+  font-weight: 500;
+}
+
+[data-theme="light"] .log-timestamp {
+  color: #0891b2;
+}
+
+.log-error {
+  color: #ef4444;
+}
+
+[data-theme="light"] .log-error {
+  color: #dc2626;
+}
+
+.log-link {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.log-link:hover {
+  color: #60a5fa;
+}
+
+/* Scrollbar for log viewer */
+.log-viewer::-webkit-scrollbar {
   width: 12px;
   background-color: var(--bg-secondary);
 }
 
-.xterm-viewport::-webkit-scrollbar-thumb {
+.log-viewer::-webkit-scrollbar-thumb {
   background-color: var(--bg-tertiary);
   border-radius: 6px;
   border: 2px solid var(--bg-secondary);
 }
 
-.xterm-viewport::-webkit-scrollbar-thumb:hover {
+.log-viewer::-webkit-scrollbar-thumb:hover {
   background-color: var(--text-muted);
 }
 
-.xterm-viewport::-webkit-scrollbar-track {
+.log-viewer::-webkit-scrollbar-track {
   background-color: var(--bg-secondary);
+}
+
+/* Horizontal scrollbar for long lines */
+.log-line::-webkit-scrollbar {
+  height: 8px;
+}
+
+.log-line::-webkit-scrollbar-thumb {
+  background-color: var(--bg-tertiary);
+  border-radius: 4px;
 }
