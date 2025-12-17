@@ -89,7 +89,7 @@ export function WorkloadViewModal({
     // Set view mode based on selection
     if (viewMode === 'split' && selectedPodList.length <= 4) {
       if (selectedPodList.length === 2) {
-        setStoreViewMode('split-v');
+        setStoreViewMode('split-h');
       } else if (selectedPodList.length <= 4) {
         setStoreViewMode('quad');
       }

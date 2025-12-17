@@ -15,8 +15,7 @@ export function LogToolbar() {
 
   const viewModeOptions: { value: ViewMode; label: string }[] = [
     { value: 'single', label: '단일' },
-    { value: 'split-h', label: '2분할 (가로)' },
-    { value: 'split-v', label: '2분할 (세로)' },
+    { value: 'split-h', label: '2분할' },
     { value: 'quad', label: '4분할' },
   ];
 
