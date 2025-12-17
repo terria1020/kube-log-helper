@@ -52,7 +52,7 @@ export function SplitView() {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-zinc-900 overflow-hidden">
+    <div className="flex-1 flex flex-col bg-zinc-900">
       {/* Tabs (shown when there are more sessions than display slots) */}
       {sessions.length > displaySessions.length && (
         <div className="flex bg-zinc-800 border-b border-zinc-700 overflow-x-auto">

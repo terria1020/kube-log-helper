@@ -63,6 +63,9 @@ body {
 .log-viewer {
   font-family: Menlo, Monaco, "Courier New", monospace;
   overflow: auto;
+  -webkit-app-region: no-drag;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .log-line {
