@@ -12,7 +12,7 @@ export function LogPanel({ session, isActive, onClose, onClick }: LogPanelProps)
   return (
     <div
       onClick={onClick}
-      className={`flex flex-col bg-zinc-900 overflow-hidden ${
+      className={`h-full flex flex-col bg-zinc-900 ${
         isActive ? 'ring-1 ring-blue-500' : ''
       }`}
     >
