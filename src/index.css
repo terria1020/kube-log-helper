@@ -70,6 +70,16 @@ body {
   pointer-events: auto !important;
 }
 
+/* Ensure terminal screen allows scrolling */
+.xterm .xterm-screen {
+  position: relative;
+  pointer-events: none; /* Let events pass through to viewport */
+}
+
+.xterm .xterm-screen canvas {
+  pointer-events: none; /* Canvas should not block wheel events */
+}
+
 .xterm-viewport::-webkit-scrollbar {
   width: 12px;
   background-color: var(--bg-secondary);

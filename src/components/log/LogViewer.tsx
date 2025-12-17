@@ -113,6 +113,7 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
   // Buffer for batched writes
   const logBufferRef = useRef<string[]>([]);
   const rafIdRef = useRef<number | null>(null);
+  const isAtBottomRef = useRef(true);
 
   // Update grep filters when filter changes
   useEffect(() => {
@@ -150,6 +151,17 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
 
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
+
+    // Track user scroll position
+    terminal.onScroll(() => {
+      const buffer = terminal.buffer.active;
+      const viewport = buffer.viewportY;
+      const baseY = buffer.baseY;
+      const rows = terminal.rows;
+
+      // User is at bottom if viewport is showing the last rows
+      isAtBottomRef.current = viewport + rows >= baseY + rows;
+    });
 
     // Handle resize
     const resizeObserver = new ResizeObserver(() => {
@@ -191,7 +203,13 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
     const output = logBufferRef.current.join('\r\n') + '\r\n';
     logBufferRef.current = [];
 
-    terminalRef.current.write(output);
+    // Only auto-scroll if user is at bottom
+    const shouldScroll = isAtBottomRef.current;
+    terminalRef.current.write(output, () => {
+      if (shouldScroll && terminalRef.current) {
+        terminalRef.current.scrollToBottom();
+      }
+    });
 
     rafIdRef.current = null;
   };
@@ -245,7 +263,7 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
     <div
       ref={containerRef}
       className={`h-full w-full ${isActive ? '' : 'opacity-90'}`}
-      style={{ padding: '8px', overflow: 'hidden' }}
+      style={{ padding: '8px' }}
     />
   );
 }
