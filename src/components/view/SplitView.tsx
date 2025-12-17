@@ -24,7 +24,6 @@ export function SplitView() {
         const activeSession = sessions.find((s) => s.id === activeSessionId);
         return activeSession ? [activeSession] : sessions.slice(0, 1);
       case 'split-h':
-      case 'split-v':
         return sessions.slice(0, 2);
       case 'quad':
         return sessions.slice(0, 4);
@@ -42,8 +41,6 @@ export function SplitView() {
         return 'grid-cols-1 grid-rows-1';
       case 'split-h':
         return 'grid-cols-1 grid-rows-2';
-      case 'split-v':
-        return 'grid-cols-2 grid-rows-1';
       case 'quad':
         return 'grid-cols-2 grid-rows-2';
       default:
@@ -85,7 +82,7 @@ export function SplitView() {
       )}
 
       {/* Log Viewers Grid */}
-      <div className={`flex-1 grid ${getGridClass()} gap-px bg-zinc-700`}>
+      <div className={`flex-1 min-h-0 grid ${getGridClass()} gap-px bg-zinc-700`}>
         {displaySessions.map((session) => (
           <LogPanel
             key={session.id}
