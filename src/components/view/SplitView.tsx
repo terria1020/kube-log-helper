@@ -1,5 +1,6 @@
 import { useLogStore } from '../../stores/logStore';
 import { LogPanel } from './LogPanel';
+import type { LogSession } from '../../types';
 
 export function SplitView() {
   const { sessions, activeSessionId, viewMode, setActiveSession, removeSession } = useLogStore();
@@ -17,22 +18,30 @@ export function SplitView() {
     );
   }
 
-  // Get sessions to display based on view mode
-  const getDisplaySessions = () => {
+  // Get number of visible slots based on view mode
+  const getVisibleSlots = () => {
     switch (viewMode) {
       case 'single':
-        const activeSession = sessions.find((s) => s.id === activeSessionId);
-        return activeSession ? [activeSession] : sessions.slice(0, 1);
+        return 1;
       case 'split-h':
-        return sessions.slice(0, 2);
+        return 2;
       case 'quad':
-        return sessions.slice(0, 4);
+        return 4;
       default:
-        return sessions.slice(0, 1);
+        return 1;
     }
   };
 
-  const displaySessions = getDisplaySessions();
+  const visibleSlots = getVisibleSlots();
+
+  // In single mode, show only active session
+  // In other modes, show first N sessions
+  const shouldShowSession = (session: LogSession, index: number) => {
+    if (viewMode === 'single') {
+      return session.id === activeSessionId;
+    }
+    return index < visibleSlots;
+  };
 
   // Grid layout based on view mode
   const getGridClass = () => {
@@ -50,8 +59,8 @@ export function SplitView() {
 
   return (
     <div className="flex-1 flex flex-col bg-zinc-900">
-      {/* Tabs (shown when there are more sessions than display slots) */}
-      {sessions.length > displaySessions.length && (
+      {/* Tabs (shown when there are more sessions than visible slots) */}
+      {sessions.length > visibleSlots && (
         <div className="flex bg-zinc-800 border-b border-zinc-700 overflow-x-auto">
           {sessions.map((session) => (
             <button
@@ -83,11 +92,12 @@ export function SplitView() {
 
       {/* Log Viewers Grid */}
       <div className={`flex-1 min-h-0 grid ${getGridClass()} gap-px bg-zinc-700`}>
-        {displaySessions.map((session) => (
+        {sessions.map((session, index) => (
           <LogPanel
             key={session.id}
             session={session}
             isActive={session.id === activeSessionId}
+            isVisible={shouldShowSession(session, index)}
             onClose={() => removeSession(session.id)}
             onClick={() => setActiveSession(session.id)}
           />

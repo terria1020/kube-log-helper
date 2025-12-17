@@ -4,17 +4,19 @@ import type { LogSession } from '../../types';
 interface LogPanelProps {
   session: LogSession;
   isActive: boolean;
+  isVisible: boolean;
   onClose: () => void;
   onClick: () => void;
 }
 
-export function LogPanel({ session, isActive, onClose, onClick }: LogPanelProps) {
+export function LogPanel({ session, isActive, isVisible, onClose, onClick }: LogPanelProps) {
   return (
     <div
       onClick={onClick}
       className={`h-full min-h-0 flex flex-col bg-zinc-900 overflow-hidden ${
         isActive ? 'ring-1 ring-blue-500' : ''
       }`}
+      style={{ display: isVisible ? 'flex' : 'none' }}
     >
       {/* Panel Header */}
       <div className="flex items-center justify-between px-3 py-1.5 bg-zinc-800 border-b border-zinc-700">
