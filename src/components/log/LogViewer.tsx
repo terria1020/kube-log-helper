@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, memo } from 'react';
-import { FixedSizeList as List, ListChildComponentProps } from 'react-window';
+import { List } from 'react-window';
+import type { ListImperativeAPI } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import type { LogSession } from '../../types';
 import { useLogStore } from '../../stores/logStore';
@@ -109,9 +110,14 @@ function renderLineWithLinks(text: string): React.ReactNode[] {
 }
 
 // Memoized log line row component
-const LogLineRow = memo(({ index, style, data }: ListChildComponentProps<{ lines: ParsedLogLine[]; theme: string }>) => {
-  const line = data.lines[index];
-  const theme = data.theme;
+const LogLineRow = memo((props: {
+  index: number;
+  style: React.CSSProperties;
+  lines: ParsedLogLine[];
+  theme: string;
+}) => {
+  const line = props.lines[props.index];
+  const theme = props.theme;
 
   const content = line.timestampEnd
     ? line.raw.substring(line.timestampEnd)
@@ -119,7 +125,7 @@ const LogLineRow = memo(({ index, style, data }: ListChildComponentProps<{ lines
 
   return (
     <div
-      style={style}
+      style={props.style}
       className={`log-line ${theme === 'dark' ? 'log-line-dark' : 'log-line-light'}`}
     >
       {line.timestamp && (
@@ -132,19 +138,19 @@ const LogLineRow = memo(({ index, style, data }: ListChildComponentProps<{ lines
   );
 }, (prevProps, nextProps) => {
   return prevProps.index === nextProps.index &&
-    prevProps.data === nextProps.data &&
-    prevProps.style === nextProps.style;
+    prevProps.lines === nextProps.lines &&
+    prevProps.theme === nextProps.theme;
 });
 
 LogLineRow.displayName = 'LogLineRow';
 
 export function LogViewer({ session, isActive }: LogViewerProps) {
-  const listRef = useRef<List>(null);
+  const listRef = useRef<ListImperativeAPI>(null);
   const logLinesRef = useRef<ParsedLogLine[]>([]);
   const [displayLines, setDisplayLines] = useState<ParsedLogLine[]>([]);
   const isAtBottomRef = useRef(true);
   const containerRef = useRef<HTMLDivElement>(null);
-  const filterTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const filterTimerRef = useRef<number | null>(null);
   const pendingLinesRef = useRef<ParsedLogLine[]>([]);
   const rafIdRef = useRef<number | null>(null);
 
@@ -166,7 +172,7 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
       clearTimeout(filterTimerRef.current);
     }
 
-    filterTimerRef.current = setTimeout(() => {
+    filterTimerRef.current = window.setTimeout(() => {
       const filters = grepFiltersRef.current;
       const filtered = logLinesRef.current.filter(line =>
         applyGrepFilter(line.raw, filters)
@@ -235,20 +241,17 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
   // Auto-scroll when new lines arrive and user is at bottom
   useEffect(() => {
     if (isAtBottomRef.current && displayLines.length > 0 && listRef.current) {
-      listRef.current.scrollToItem(displayLines.length - 1, 'end');
+      listRef.current.scrollToRow({
+        index: displayLines.length - 1,
+        align: 'end',
+      });
     }
   }, [displayLines.length]);
 
-  // Handle scroll to detect if user is at bottom
-  const handleScroll = ({ scrollOffset }: { scrollOffset: number }) => {
-    if (!containerRef.current) return;
-
-    const totalHeight = displayLines.length * lineHeight;
-    const viewportHeight = containerRef.current.clientHeight;
-    const scrollBottom = scrollOffset + viewportHeight;
-
-    // Consider "at bottom" if within 50px of bottom
-    isAtBottomRef.current = totalHeight - scrollBottom < 50;
+  // Handle rows rendered to detect if user is at bottom
+  const handleRowsRendered = ({ stopIndex }: { startIndex: number; stopIndex: number }) => {
+    // Consider "at bottom" if showing last row or close to it
+    isAtBottomRef.current = stopIndex >= displayLines.length - 3;
   };
 
   return (
@@ -260,21 +263,26 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
       <AutoSizer>
         {({ height, width }) => (
           <List
-            ref={listRef}
+            listRef={listRef}
             className="log-viewer"
-            height={height}
-            width={width}
-            itemCount={displayLines.length}
-            itemSize={lineHeight}
-            itemData={{ lines: displayLines, theme }}
-            onScroll={handleScroll}
+            rowComponent={(rowProps) => (
+              <LogLineRow
+                {...rowProps}
+                lines={displayLines}
+                theme={theme}
+              />
+            )}
+            rowCount={displayLines.length}
+            rowHeight={lineHeight}
+            rowProps={{}}
+            onRowsRendered={handleRowsRendered}
             style={{
               fontFamily: 'Menlo, Monaco, "Courier New", monospace',
               fontSize: `${session.fontSize}px`,
+              height,
+              width,
             }}
-          >
-            {LogLineRow}
-          </List>
+          />
         )}
       </AutoSizer>
     </div>
