@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLogStore } from '../../stores/logStore';
 import { useSelectorStore } from '../../stores/selectorStore';
-import type { PodInfo, WorkloadType, LogViewMode } from '../../types';
+import type { PodInfo, WorkloadType } from '../../types';
 
 interface WorkloadViewModalProps {
   isOpen: boolean;
@@ -24,10 +24,9 @@ export function WorkloadViewModal({
 }: WorkloadViewModalProps) {
   const [pods, setPods] = useState<PodInfo[]>([]);
   const [selectedPods, setSelectedPods] = useState<Set<string>>(new Set());
-  const [viewMode, setViewMode] = useState<LogViewMode>('tabs');
   const [isLoading, setIsLoading] = useState(false);
 
-  const { addSession, setViewMode: setStoreViewMode } = useLogStore();
+  const { addSession } = useLogStore();
   const { isFollowing, startTime } = useSelectorStore();
 
   useEffect(() => {
@@ -85,15 +84,6 @@ export function WorkloadViewModal({
     const selectedPodList = pods.filter((p) => selectedPods.has(p.name));
 
     if (selectedPodList.length === 0) return;
-
-    // Set view mode based on selection
-    if (viewMode === 'split' && selectedPodList.length <= 4) {
-      if (selectedPodList.length === 2) {
-        setStoreViewMode('split-h');
-      } else if (selectedPodList.length <= 4) {
-        setStoreViewMode('quad');
-      }
-    }
 
     // Create sessions for each selected pod
     for (const pod of selectedPodList) {
@@ -191,52 +181,6 @@ export function WorkloadViewModal({
                   </label>
                 ))
               )}
-            </div>
-          </div>
-
-          {/* View Mode */}
-          <div>
-            <span className="text-sm text-zinc-300 block mb-2">로그 보기 방식</span>
-            <div className="space-y-2">
-              <label className="flex items-start gap-3 p-3 bg-zinc-900 rounded-md border border-zinc-700 cursor-pointer hover:border-zinc-600">
-                <input
-                  type="radio"
-                  name="viewMode"
-                  checked={viewMode === 'merged'}
-                  onChange={() => setViewMode('merged')}
-                  className="mt-0.5 border-zinc-600 bg-zinc-900 text-blue-600 focus:ring-blue-500"
-                />
-                <div>
-                  <span className="text-sm text-white block">합쳐서 보기</span>
-                  <span className="text-xs text-zinc-400">단일 뷰에 모든 로그 통합 (타임스탬프 순 정렬)</span>
-                </div>
-              </label>
-              <label className="flex items-start gap-3 p-3 bg-zinc-900 rounded-md border border-zinc-700 cursor-pointer hover:border-zinc-600">
-                <input
-                  type="radio"
-                  name="viewMode"
-                  checked={viewMode === 'tabs'}
-                  onChange={() => setViewMode('tabs')}
-                  className="mt-0.5 border-zinc-600 bg-zinc-900 text-blue-600 focus:ring-blue-500"
-                />
-                <div>
-                  <span className="text-sm text-white block">각각 탭으로 열기</span>
-                  <span className="text-xs text-zinc-400">Pod별 개별 탭으로 로그 확인</span>
-                </div>
-              </label>
-              <label className="flex items-start gap-3 p-3 bg-zinc-900 rounded-md border border-zinc-700 cursor-pointer hover:border-zinc-600">
-                <input
-                  type="radio"
-                  name="viewMode"
-                  checked={viewMode === 'split'}
-                  onChange={() => setViewMode('split')}
-                  className="mt-0.5 border-zinc-600 bg-zinc-900 text-blue-600 focus:ring-blue-500"
-                />
-                <div>
-                  <span className="text-sm text-white block">분할 뷰로 열기</span>
-                  <span className="text-xs text-zinc-400">그리드 분할로 동시 표시 (최대 4개)</span>
-                </div>
-              </label>
             </div>
           </div>
         </div>

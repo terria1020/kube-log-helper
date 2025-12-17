@@ -51,7 +51,7 @@ export interface LogStreamConfig {
   tailLines?: number;
 }
 
-export type ViewMode = 'single' | 'split-h' | 'quad';
+export type ViewMode = 'single' | 'split-h';
 
 export type WorkloadType = 'deployment' | 'statefulset' | 'daemonset' | 'label';
 
