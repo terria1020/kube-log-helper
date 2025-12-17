@@ -25,8 +25,6 @@ export function SplitView() {
         return 1;
       case 'split-h':
         return 2;
-      case 'quad':
-        return 4;
       default:
         return 1;
     }
@@ -49,9 +47,7 @@ export function SplitView() {
       case 'single':
         return 'grid-cols-1 grid-rows-1';
       case 'split-h':
-        return 'grid-cols-1 grid-rows-2';
-      case 'quad':
-        return 'grid-cols-2 grid-rows-2';
+        return 'grid-cols-2 grid-rows-1';
       default:
         return 'grid-cols-1 grid-rows-1';
     }
