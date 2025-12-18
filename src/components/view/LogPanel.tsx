@@ -13,7 +13,7 @@ export function LogPanel({ session, isActive, isVisible, onClose, onClick }: Log
   return (
     <div
       onClick={onClick}
-      className={`h-full min-h-0 flex flex-col bg-zinc-900 overflow-hidden ${
+      className={`h-full min-h-0 flex flex-col bg-zinc-900 ${
         isActive ? 'ring-1 ring-blue-500' : ''
       }`}
       style={{ display: isVisible ? 'flex' : 'none' }}
