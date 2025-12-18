@@ -13,7 +13,7 @@ export function LogPanel({ session, isActive, isVisible, onClose, onClick }: Log
   return (
     <div
       onClick={onClick}
-      className={`h-full min-h-0 flex flex-col bg-zinc-900 ${
+      className={`h-full min-h-0 flex flex-col bg-zinc-900 relative ${
         isActive ? 'ring-1 ring-blue-500' : ''
       }`}
       style={{ display: isVisible ? 'flex' : 'none' }}
@@ -43,7 +43,7 @@ export function LogPanel({ session, isActive, isVisible, onClose, onClick }: Log
       </div>
 
       {/* Log Content */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 relative overflow-hidden">
         <LogViewer session={session} isActive={isActive} />
       </div>
     </div>

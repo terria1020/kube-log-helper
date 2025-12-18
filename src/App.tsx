@@ -52,7 +52,7 @@ function App() {
       <Header />
       <SelectorBar onStartLog={handleStartLog} />
       <LogToolbar />
-      <div className="flex-1 min-h-0 flex flex-col">
+      <div className="flex-1 min-h-0 relative overflow-hidden">
         <SplitView />
       </div>
     </div>

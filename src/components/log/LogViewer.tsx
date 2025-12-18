@@ -217,7 +217,7 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
   return (
     <div
       ref={containerRef}
-      className={`h-full w-full log-viewer ${isActive ? '' : 'opacity-90'}`}
+      className={`absolute inset-0 log-viewer ${isActive ? '' : 'opacity-90'}`}
       style={{
         padding: '8px',
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
