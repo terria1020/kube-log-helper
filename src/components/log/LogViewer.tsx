@@ -220,7 +220,6 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
       className={`h-full w-full log-viewer ${isActive ? '' : 'opacity-90'}`}
       style={{
         padding: '8px',
-        overflow: 'auto',
         fontFamily: 'Menlo, Monaco, "Courier New", monospace',
         fontSize: `${session.fontSize}px`,
       }}
