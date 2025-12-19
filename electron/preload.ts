@@ -112,6 +112,23 @@ const electronAPI = {
     return () => ipcRenderer.removeListener('k8s:logs:error', handler);
   },
 
+  // Shell filter
+  startShellFilter: (sessionId: string, command: string): Promise<{ success: boolean; error?: string }> =>
+    ipcRenderer.invoke('filter:start', { sessionId, command }),
+  stopShellFilter: (sessionId: string): Promise<void> =>
+    ipcRenderer.invoke('filter:stop', { sessionId }),
+  writeToFilter: (sessionId: string, data: string): Promise<boolean> =>
+    ipcRenderer.invoke('filter:write', { sessionId, data }),
+  onFilterData: (callback: (data: { sessionId: string; data: string }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, data: { sessionId: string; data: string }) => callback(data);
+    ipcRenderer.on('filter:data', handler);
+    return () => ipcRenderer.removeListener('filter:data', handler);
+  },
+  onFilterError: (callback: (data: { sessionId: string; error: string }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, data: { sessionId: string; error: string }) => callback(data);
+    ipcRenderer.on('filter:error', handler);
+    return () => ipcRenderer.removeListener('filter:error', handler);
+  },
 };
 
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);

@@ -15,47 +15,6 @@ interface LogViewerProps {
   isActive: boolean;
 }
 
-// Parse and apply grep pipeline filter
-function parseGrepPipeline(filter: string): Array<{ pattern: RegExp; exclude: boolean }> {
-  if (!filter.trim()) return [];
-
-  const filters: Array<{ pattern: RegExp; exclude: boolean }> = [];
-
-  // Split by pipe
-  const parts = filter.split('|').map(p => p.trim());
-
-  for (const part of parts) {
-    if (!part) continue;
-
-    // Match: grep "pattern" or grep -v "pattern" or grep 'pattern' or grep pattern
-    const grepMatch = part.match(/^grep\s+(-v\s+)?(?:"([^"]+)"|'([^']+)'|(\S+))$/i);
-    if (grepMatch) {
-      const exclude = !!grepMatch[1];
-      const pattern = grepMatch[2] || grepMatch[3] || grepMatch[4];
-      try {
-        filters.push({ pattern: new RegExp(pattern, 'i'), exclude });
-      } catch {
-        // Invalid regex, treat as literal string
-        filters.push({ pattern: new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'), exclude });
-      }
-    }
-  }
-
-  return filters;
-}
-
-function applyGrepFilter(line: string, filters: Array<{ pattern: RegExp; exclude: boolean }>): boolean {
-  if (filters.length === 0) return true;
-
-  for (const filter of filters) {
-    const matches = filter.pattern.test(line);
-    if (filter.exclude && matches) return false; // grep -v: exclude if matches
-    if (!filter.exclude && !matches) return false; // grep: include only if matches
-  }
-
-  return true;
-}
-
 // Parse log line to extract timestamp and detect errors
 function parseLogLine(line: string): ParsedLogLine {
   // ISO 8601 pattern
@@ -111,47 +70,31 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
   const logLinesRef = useRef<ParsedLogLine[]>([]);
   const [displayLines, setDisplayLines] = useState<ParsedLogLine[]>([]);
   const isAtBottomRef = useRef(true);
-  const filterTimerRef = useRef<number | null>(null);
   const pendingLinesRef = useRef<ParsedLogLine[]>([]);
   const rafIdRef = useRef<number | null>(null);
+  const pendingFilterLinesRef = useRef<ParsedLogLine[]>([]);
+  const filterRafIdRef = useRef<number | null>(null);
 
-  const { grepFilter, clearLogsTrigger } = useLogStore();
+  const { clearLogsTrigger, isFilterActive, setFilterError } = useLogStore();
+  const filterActive = isFilterActive(session.id);
   const theme = useSettingsStore((state) => state.theme);
-  const grepFiltersRef = useRef<Array<{ pattern: RegExp; exclude: boolean }>>([]);
-
-  // Update grep filters when filter changes
-  useEffect(() => {
-    grepFiltersRef.current = parseGrepPipeline(grepFilter);
-  }, [grepFilter]);
-
-  // Apply filter and update display
-  const applyFilterAndUpdate = () => {
-    if (filterTimerRef.current) {
-      clearTimeout(filterTimerRef.current);
-    }
-
-    filterTimerRef.current = window.setTimeout(() => {
-      const filters = grepFiltersRef.current;
-      const filtered = logLinesRef.current.filter(line =>
-        applyGrepFilter(line.raw, filters)
-      );
-      setDisplayLines(filtered);
-    }, 100);
-  };
-
-  // Re-filter when grep filter changes
-  useEffect(() => {
-    applyFilterAndUpdate();
-  }, [grepFilter]);
 
   // Clear logs when clearLogsTrigger changes
   useEffect(() => {
     if (clearLogsTrigger > 0) {
       logLinesRef.current = [];
       pendingLinesRef.current = [];
+      pendingFilterLinesRef.current = [];
       setDisplayLines([]);
     }
   }, [clearLogsTrigger]);
+
+  // Update display based on filter state
+  const updateDisplay = () => {
+    if (!filterActive) {
+      setDisplayLines([...logLinesRef.current]);
+    }
+  };
 
   // Batch log updates using RAF
   const scheduleBatchUpdate = () => {
@@ -165,8 +108,23 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
         }
 
         pendingLinesRef.current = [];
-        applyFilterAndUpdate();
+        updateDisplay();
         rafIdRef.current = null;
+      });
+    }
+  };
+
+  // Batch filter result updates
+  const scheduleFilterUpdate = () => {
+    if (filterRafIdRef.current === null) {
+      filterRafIdRef.current = requestAnimationFrame(() => {
+        setDisplayLines(prev => {
+          const newLines = [...prev, ...pendingFilterLinesRef.current];
+          // Limit display lines
+          return newLines.length > 10000 ? newLines.slice(-10000) : newLines;
+        });
+        pendingFilterLinesRef.current = [];
+        filterRafIdRef.current = null;
       });
     }
   };
@@ -177,8 +135,15 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
       if (data.sessionId === session.id) {
         const lines = data.data.split('\n').filter(l => l.trim());
         const parsed = lines.map(parseLogLine);
+
+        // Always store in buffer
         pendingLinesRef.current.push(...parsed);
         scheduleBatchUpdate();
+
+        // If filter is active, send to shell filter
+        if (filterActive) {
+          window.electronAPI.writeToFilter(session.id, data.data);
+        }
       }
     });
 
@@ -199,11 +164,45 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
       if (rafIdRef.current !== null) {
         cancelAnimationFrame(rafIdRef.current);
       }
-      if (filterTimerRef.current !== null) {
-        clearTimeout(filterTimerRef.current);
+    };
+  }, [session.id, filterActive]);
+
+  // Listen for shell filter results
+  useEffect(() => {
+    const unsubscribeFilterData = window.electronAPI.onFilterData((data) => {
+      if (data.sessionId === session.id && filterActive) {
+        const lines = data.data.split('\n').filter(l => l.trim());
+        const parsed = lines.map(parseLogLine);
+        pendingFilterLinesRef.current.push(...parsed);
+        scheduleFilterUpdate();
+      }
+    });
+
+    const unsubscribeFilterError = window.electronAPI.onFilterError((data) => {
+      if (data.sessionId === session.id) {
+        setFilterError(session.id, data.error);
+      }
+    });
+
+    return () => {
+      unsubscribeFilterData();
+      unsubscribeFilterError();
+      if (filterRafIdRef.current !== null) {
+        cancelAnimationFrame(filterRafIdRef.current);
       }
     };
-  }, [session.id]);
+  }, [session.id, filterActive, setFilterError]);
+
+  // Clear filtered display when filter becomes active
+  useEffect(() => {
+    if (filterActive) {
+      setDisplayLines([]);
+      pendingFilterLinesRef.current = [];
+    } else {
+      // When filter is deactivated, show original buffer
+      setDisplayLines([...logLinesRef.current]);
+    }
+  }, [filterActive]);
 
   // Auto-scroll when new lines arrive and user is at bottom
   useEffect(() => {
