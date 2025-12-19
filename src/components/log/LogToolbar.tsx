@@ -3,7 +3,7 @@ import { useLogStore } from '../../stores/logStore';
 import type { ViewMode } from '../../types';
 
 export function LogToolbar() {
-  const { viewMode, setViewMode, globalFontSize, setGlobalFontSize, grepFilter, setGrepFilter, sessions, stopAllSessions } = useLogStore();
+  const { viewMode, setViewMode, globalFontSize, setGlobalFontSize, grepFilter, setGrepFilter, sessions, stopAllSessions, clearAllLogs } = useLogStore();
   const [filterInput, setFilterInput] = useState(grepFilter);
   const [isStopping, setIsStopping] = useState(false);
 
@@ -79,6 +79,18 @@ export function LogToolbar() {
             </button>
           )}
         </div>
+
+        {/* Clear All Logs */}
+        {sessions.length > 0 && (
+          <button
+            onClick={clearAllLogs}
+            className="px-3 py-1.5 text-sm rounded-md transition-colors"
+            style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
+            title="모든 로그 클리어"
+          >
+            🗑 클리어
+          </button>
+        )}
 
         {/* Stop All Streams */}
         {sessions.length > 0 && (

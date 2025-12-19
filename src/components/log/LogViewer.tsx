@@ -115,7 +115,7 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
   const pendingLinesRef = useRef<ParsedLogLine[]>([]);
   const rafIdRef = useRef<number | null>(null);
 
-  const { grepFilter } = useLogStore();
+  const { grepFilter, clearLogsTrigger } = useLogStore();
   const theme = useSettingsStore((state) => state.theme);
   const grepFiltersRef = useRef<Array<{ pattern: RegExp; exclude: boolean }>>([]);
 
@@ -143,6 +143,15 @@ export function LogViewer({ session, isActive }: LogViewerProps) {
   useEffect(() => {
     applyFilterAndUpdate();
   }, [grepFilter]);
+
+  // Clear logs when clearLogsTrigger changes
+  useEffect(() => {
+    if (clearLogsTrigger > 0) {
+      logLinesRef.current = [];
+      pendingLinesRef.current = [];
+      setDisplayLines([]);
+    }
+  }, [clearLogsTrigger]);
 
   // Batch log updates using RAF
   const scheduleBatchUpdate = () => {

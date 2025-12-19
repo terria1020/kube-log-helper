@@ -8,6 +8,7 @@ interface LogStore {
   viewMode: ViewMode;
   globalFontSize: number;
   grepFilter: string;
+  clearLogsTrigger: number;
 
   addSession: (config: Omit<LogSession, 'id' | 'isStreaming' | 'fontSize'>) => string;
   removeSession: (id: string) => void;
@@ -20,6 +21,7 @@ interface LogStore {
   setViewMode: (mode: ViewMode) => void;
   setGrepFilter: (filter: string) => void;
   clearSessions: () => void;
+  clearAllLogs: () => void;
 }
 
 export const useLogStore = create<LogStore>((set, get) => ({
@@ -28,6 +30,7 @@ export const useLogStore = create<LogStore>((set, get) => ({
   viewMode: 'single',
   globalFontSize: 10,
   grepFilter: '',
+  clearLogsTrigger: 0,
 
   addSession: (config) => {
     const id = uuidv4();
@@ -105,5 +108,9 @@ export const useLogStore = create<LogStore>((set, get) => ({
 
   clearSessions: () => {
     set({ sessions: [], activeSessionId: null });
+  },
+
+  clearAllLogs: () => {
+    set((state) => ({ clearLogsTrigger: state.clearLogsTrigger + 1 }));
   },
 }));
