@@ -3,9 +3,33 @@ import { useLogStore } from '../../stores/logStore';
 import type { ViewMode } from '../../types';
 
 export function LogToolbar() {
-  const { viewMode, setViewMode, globalFontSize, setGlobalFontSize, grepFilter, setGrepFilter, sessions, stopAllSessions, clearAllLogs } = useLogStore();
-  const [filterInput, setFilterInput] = useState(grepFilter);
+  const {
+    viewMode, setViewMode,
+    globalFontSize, setGlobalFontSize,
+    sessions, stopAllSessions, clearAllLogs,
+    activeSessionId,
+    setSessionFilter, startFilter, stopFilter,
+    isFilterActive, getFilterCommand, filterErrors
+  } = useLogStore();
+
+  const [filterInput, setFilterInput] = useState('');
   const [isStopping, setIsStopping] = useState(false);
+
+  const currentSessionId = activeSessionId;
+  const filterActive = currentSessionId ? isFilterActive(currentSessionId) : false;
+  const filterError = currentSessionId ? filterErrors[currentSessionId] : null;
+
+  // Sync filter input with current session's filter
+  const handleSessionChange = () => {
+    if (currentSessionId) {
+      setFilterInput(getFilterCommand(currentSessionId));
+    }
+  };
+
+  // Update input when active session changes
+  useState(() => {
+    handleSessionChange();
+  });
 
   const handleStopAll = async () => {
     setIsStopping(true);
@@ -23,8 +47,30 @@ export function LogToolbar() {
     setGlobalFontSize(newSize);
   };
 
-  const handleFilterApply = () => {
-    setGrepFilter(filterInput);
+  const handleFilterApply = async () => {
+    if (!currentSessionId) return;
+
+    if (filterActive) {
+      // Stop current filter first
+      await stopFilter(currentSessionId);
+    }
+
+    if (filterInput.trim()) {
+      setSessionFilter(currentSessionId, filterInput);
+      await startFilter(currentSessionId);
+    }
+  };
+
+  const handleFilterStop = async () => {
+    if (!currentSessionId) return;
+    await stopFilter(currentSessionId);
+  };
+
+  const handleFilterClear = async () => {
+    if (!currentSessionId) return;
+    await stopFilter(currentSessionId);
+    setFilterInput('');
+    setSessionFilter(currentSessionId, '');
   };
 
   const handleFilterKeyDown = (e: React.KeyboardEvent) => {
@@ -50,33 +96,51 @@ export function LogToolbar() {
           ))}
         </select>
 
-        {/* Grep Filter */}
+        {/* Shell Filter */}
         <div className="flex items-center gap-1">
           <input
             type="text"
             value={filterInput}
             onChange={(e) => setFilterInput(e.target.value)}
             onKeyDown={handleFilterKeyDown}
-            placeholder='grep "패턴" | grep -v "제외"'
-            className="w-64 px-3 py-1.5 rounded-md text-sm focus:outline-none focus:border-blue-500 font-mono"
+            placeholder='grep "error" | awk | jq ...'
+            className="w-72 px-3 py-1.5 rounded-md text-sm focus:outline-none focus:border-blue-500 font-mono"
             style={{ backgroundColor: 'var(--bg-input)', border: '1px solid var(--border-light)', color: 'var(--text-primary)' }}
+            disabled={!currentSessionId}
           />
-          <button
-            onClick={handleFilterApply}
-            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded-md transition-colors"
-            title="필터 적용"
-          >
-            적용
-          </button>
-          {grepFilter && (
+          {!filterActive ? (
             <button
-              onClick={() => { setFilterInput(''); setGrepFilter(''); }}
+              onClick={handleFilterApply}
+              disabled={!currentSessionId || !filterInput.trim()}
+              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded-md transition-colors disabled:opacity-50"
+              title="필터 적용"
+            >
+              적용
+            </button>
+          ) : (
+            <button
+              onClick={handleFilterStop}
+              className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-sm rounded-md transition-colors"
+              title="필터 중지"
+            >
+              중지
+            </button>
+          )}
+          {(filterActive || filterInput) && (
+            <button
+              onClick={handleFilterClear}
               className="px-2 py-1.5 text-sm rounded-md transition-colors"
               style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
               title="필터 초기화"
             >
               ✕
             </button>
+          )}
+          {filterActive && (
+            <span className="text-green-500 text-xs ml-1">● 필터 활성</span>
+          )}
+          {filterError && (
+            <span className="text-red-500 text-xs ml-1" title={filterError}>⚠ 오류</span>
           )}
         </div>
 
@@ -88,7 +152,7 @@ export function LogToolbar() {
             style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-primary)' }}
             title="모든 로그 클리어"
           >
-            🗑 클리어
+            클리어
           </button>
         )}
 
@@ -100,7 +164,7 @@ export function LogToolbar() {
             className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm rounded-md transition-colors disabled:opacity-50"
             title="모든 로그 스트림 중지"
           >
-            {isStopping ? '중지 중...' : '⏹ 전체 중지'}
+            {isStopping ? '중지 중...' : '전체 중지'}
           </button>
         )}
 

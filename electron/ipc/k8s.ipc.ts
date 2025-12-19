@@ -1,5 +1,6 @@
 import { ipcMain, BrowserWindow } from 'electron';
 import { k8sService } from '../services/k8s.service.js';
+import { shellFilterService } from '../services/shell-filter.service.js';
 
 export function registerK8sIpc(): void {
   // Namespace operations
@@ -74,5 +75,36 @@ export function registerK8sIpc(): void {
 
   ipcMain.handle('k8s:logs:stop', async (_event, { sessionId }) => {
     k8sService.stopLogStream(sessionId);
+  });
+
+  // Shell filter
+  ipcMain.handle('filter:start', async (event, { sessionId, command }) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window) return { success: false, error: 'Window not found' };
+
+    const result = shellFilterService.startFilter(
+      sessionId,
+      command,
+      (data) => {
+        if (!window.isDestroyed()) {
+          window.webContents.send('filter:data', { sessionId, data });
+        }
+      },
+      (error) => {
+        if (!window.isDestroyed()) {
+          window.webContents.send('filter:error', { sessionId, error });
+        }
+      }
+    );
+
+    return result;
+  });
+
+  ipcMain.handle('filter:stop', async (_event, { sessionId }) => {
+    shellFilterService.stopFilter(sessionId);
+  });
+
+  ipcMain.handle('filter:write', async (_event, { sessionId, data }) => {
+    return shellFilterService.writeToFilter(sessionId, data);
   });
 }

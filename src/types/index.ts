@@ -85,6 +85,12 @@ declare global {
       stopLogStream: (sessionId: string) => Promise<void>;
       onLogData: (callback: (data: { sessionId: string; data: string }) => void) => () => void;
       onLogError: (callback: (data: { sessionId: string; error: string }) => void) => () => void;
+      // Shell filter
+      startShellFilter: (sessionId: string, command: string) => Promise<{ success: boolean; error?: string }>;
+      stopShellFilter: (sessionId: string) => Promise<void>;
+      writeToFilter: (sessionId: string, data: string) => Promise<boolean>;
+      onFilterData: (callback: (data: { sessionId: string; data: string }) => void) => () => void;
+      onFilterError: (callback: (data: { sessionId: string; error: string }) => void) => () => void;
     };
   }
 }
